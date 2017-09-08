@@ -56,18 +56,24 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
-    vgg_layer7_out_1x1_conv = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same') # 1x1 convolution
-    vgg_layer4_out_1x1_conv = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, padding='same') # 1x1 convolution
-    vgg_layer3_out_1x1_conv = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, padding='same') # 1x1 convolution
+    layer7_conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1, 1), padding='same') # 1x1 convolution
+    output = tf.layers.conv2d_transpose(layer7_conv_1x1, num_classes, 4, strides=(2, 2), padding='same',
+                                        kernel_initializer=tf.truncated_normal_initializer(stddev=1e-2),
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) # upsample x2
 
-    vgg_layer7_out_upscaled = tf.layers.conv2d_transpose(vgg_layer7_out_1x1_conv, num_classes, 4, 2, 'same') # upsample x2
+    layer4_conv_1x1 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1, 1), padding='same') # 1x1 convolution
+    output = tf.add(output, layer4_conv_1x1) # skip layers 7 to 4
 
-    vgg_skipped_7_4 = tf.add(vgg_layer7_out_upscaled, vgg_layer4_out_1x1_conv) # skip layers 7 to 4
-    vgg_skipped_7_4_upscaled = tf.layers.conv2d_transpose(vgg_skipped_7_4, num_classes, 4, 2, 'same') # upsample x2
+    output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same',
+                                        kernel_initializer=tf.truncated_normal_initializer(stddev=1e-2),
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) # upsample x2
 
-    vgg_skipped_4_3 = tf.add(vgg_skipped_7_4_upscaled, vgg_layer3_out_1x1_conv) # skip layers 4 to 3
+    layer3_conv_1x1 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1, 1), padding='same') # 1x1 convolution
+    output = tf.add(output, layer3_conv_1x1) # skip layers 4 to 3
 
-    output = tf.layers.conv2d_transpose(vgg_layer7_out_1x1_conv, num_classes, 16, 8, 'same') # upsample x2
+    output = tf.layers.conv2d_transpose(output, num_classes, 16, strides=(8, 8), padding='same',
+                                        kernel_initializer=tf.truncated_normal_initializer(stddev=1e-2),
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) # upsample x2
 
     return output
 tests.test_layers(layers)
@@ -142,8 +148,8 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # TODO: Build NN using load_vgg, layers, and optimize function
-        epochs = 6
-        batch_size = 2
+        epochs = 50
+        batch_size = 8
         learning_rate = tf.placeholder(tf.float32)
         correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes])
 
